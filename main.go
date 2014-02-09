@@ -23,20 +23,40 @@ func main() {
 
 	host := "localhost"
 	port := 25565
+
+	json := pingServer(host, port)
+	fmt.Printf("Ping Response:\n%s\n\n", json)
+
+	joinServer(host, port)
+}
+
+func connect(host string, port int) net.Conn {
 	conn, err := net.Dial("tcp", host+":"+strconv.Itoa(port))
 	checkError(err)
 
-	defer conn.Close()
-
-	json := pingServer(conn, host, port)
-
-	fmt.Printf("Ping Response:\n%s\n", json)
+	return conn
 }
 
-func pingServer(conn net.Conn, host string, port int) string {
+func pingServer(host string, port int) string {
+	conn := connect(host, port)
+	defer conn.Close()
+
 	sendHandshake(conn, host, port, 1)
 	sendStatusRequest(conn)
 	return readStatusRequest(conn)
+}
+
+func joinServer(host string, port int) {
+	conn := connect(host, port)
+	defer conn.Close()
+
+	fmt.Println("Going to join server")
+
+	sendHandshake(conn, host, port, 2)
+	sendLoginStart(conn)
+
+	reader := bufio.NewReader(conn)
+	readLoginSuccess(reader)
 }
 
 func sendHandshake(conn net.Conn, host string, port int, state int) {
@@ -59,6 +79,15 @@ func sendStatusRequest(conn net.Conn) {
 	sendPacket(conn, buf)
 }
 
+func sendLoginStart(conn net.Conn) {
+	buf := new(bytes.Buffer)
+
+	writeVarint(buf, 0)             // packet id
+	writeString(buf, "gophercraft") // username
+
+	sendPacket(conn, buf)
+}
+
 func readStatusRequest(conn net.Conn) string {
 	reader := bufio.NewReader(conn)
 	var err error
@@ -69,14 +98,29 @@ func readStatusRequest(conn net.Conn) string {
 	_, err = binary.ReadUvarint(reader)
 	checkError(err)
 
-	var stringSize uint64
-	stringSize, err = binary.ReadUvarint(reader)
+	return readString(reader)
+}
+
+func readLoginSuccess(reader *bufio.Reader) {
+	var err error
+
+	_, err = binary.ReadUvarint(reader)
 	checkError(err)
 
-	stringbytes := make([]byte, stringSize)
-	reader.Read(stringbytes)
+	var packetId uint64
+	packetId, err = binary.ReadUvarint(reader)
 
-	return string(stringbytes)
+	if packetId != 2 {
+		panic("Expected packet id 2 (Login Success), got: " + strconv.Itoa(int(packetId)))
+	}
+
+	fmt.Println("Got login success packet!")
+
+	uuid := readString(reader)
+	fmt.Printf("UUID: %s\n", uuid)
+
+	username := readString(reader)
+	fmt.Printf("Username: %s\n", username)
 }
 
 func checkError(err error) {
@@ -102,6 +146,16 @@ func writeString(w io.Writer, s string) (err error) {
 	checkError(err)
 
 	return
+}
+
+func readString(reader *bufio.Reader) string {
+	stringSize, err := binary.ReadUvarint(reader)
+	checkError(err)
+
+	stringbytes := make([]byte, stringSize)
+	reader.Read(stringbytes)
+
+	return string(stringbytes)
 }
 
 func writeData(w io.Writer, data interface{}) {
