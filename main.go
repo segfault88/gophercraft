@@ -12,6 +12,7 @@ import (
 	// "strings"
 	// "encoding/hex"
 	"strconv"
+	"time"
 )
 
 var (
@@ -46,6 +47,12 @@ func pingServer(host string, port int) string {
 	return readStatusRequest(conn)
 }
 
+type Packet struct {
+	packetId   int
+	pacetSize  int
+	packetData []byte
+}
+
 func joinServer(host string, port int) {
 	conn := connect(host, port)
 	defer conn.Close()
@@ -55,8 +62,80 @@ func joinServer(host string, port int) {
 	sendHandshake(conn, host, port, 2)
 	sendLoginStart(conn)
 
+	tick := make(chan bool)
+
+	go func() {
+		for {
+			time.Sleep(40 * time.Millisecond)
+			tick <- true
+		}
+	}()
+
 	reader := bufio.NewReader(conn)
 	readLoginSuccess(reader)
+
+	fromServer := make(chan Packet)
+
+	go func() {
+		reader := bufio.NewReader(conn)
+
+		for {
+			packetSize, err := binary.ReadUvarint(reader)
+			checkError(err)
+
+			// ignore the packet type in the packet length since we read it too
+			packetSize -= 1
+
+			var packetType uint64
+			packetType, err = binary.ReadUvarint(reader)
+			checkError(err)
+
+			data := make([]byte, packetSize)
+			n, _ := reader.Read(data)
+
+			for n < int(packetSize) {
+				// didn't read all the data, keep trying to read some more
+				nx, _ := reader.Read(data[n:])
+				n += nx
+			}
+
+			var packet Packet
+			packet.packetId = int(packetType)
+			packet.pacetSize = int(packetSize)
+			packet.packetData = data
+
+			fromServer <- packet
+		}
+	}()
+
+	tickCount := 0
+
+	for {
+		select {
+		case <-tick:
+			tickCount += 1
+			fmt.Printf("Tick %d\n", tickCount)
+
+			if tickCount >= 800 {
+				return
+			}
+		case packet := <-fromServer:
+			fmt.Printf("Packet: 0x%0x\t\tsize: %d\n", packet.packetId, packet.pacetSize)
+
+			switch packet.packetId {
+			case 0:
+				fmt.Printf("Keep alive: %d\n", packet.packetData)
+
+				// send it right back
+				buf := new(bytes.Buffer)
+
+				writeVarint(buf, 0)               // packet id
+				writeData(buf, packet.packetData) // keep alive id
+
+				sendPacket(conn, buf)
+			}
+		}
+	}
 }
 
 func sendHandshake(conn net.Conn, host string, port int, state int) {
