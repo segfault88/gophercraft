@@ -15,12 +15,33 @@ import (
 	"time"
 )
 
+import (
+	"github.com/go-gl/gl"
+	glfw "github.com/go-gl/glfw3"
+)
+
 var (
 	varintBuff [binary.MaxVarintLen64]byte
 )
 
 func main() {
 	fmt.Println("Gophercraft!\n")
+
+	if !glfw.Init() {
+		panic("Can't init glfw3!")
+	}
+	defer glfw.Terminate()
+
+	window, err := glfw.CreateWindow(800, 600, "Gophercraft!", nil, nil)
+
+	if err != nil {
+		panic(err)
+	}
+
+	window.MakeContextCurrent()
+	glfw.SwapInterval(1)
+
+	gl.Init()
 
 	host := "localhost"
 	port := 25565
