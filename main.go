@@ -86,8 +86,7 @@ func joinServer(host string, port int) {
 			// ignore the packet type in the packet length since we read it too
 			packetSize -= 1
 
-			var packetType uint64
-			packetType, err = binary.ReadUvarint(reader)
+			packetType, err := binary.ReadUvarint(reader)
 			checkError(err)
 
 			data := make([]byte, packetSize)
