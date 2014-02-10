@@ -11,6 +11,7 @@ import (
 	// "os"
 	// "strings"
 	// "encoding/hex"
+	"runtime"
 	"strconv"
 	"time"
 )
@@ -18,6 +19,7 @@ import (
 import (
 	"github.com/go-gl/gl"
 	glfw "github.com/go-gl/glfw3"
+	_ "github.com/go-gl/glu"
 )
 
 var (
@@ -25,6 +27,9 @@ var (
 )
 
 func main() {
+	// needed for glfw3 not to seg at the moment
+	runtime.LockOSThread()
+
 	fmt.Println("Gophercraft!\n")
 
 	if !glfw.Init() {
@@ -43,13 +48,16 @@ func main() {
 
 	gl.Init()
 
+	window.SwapBuffers()
+	defer window.Destroy()
+
 	host := "localhost"
 	port := 25565
 
 	json := pingServer(host, port)
 	fmt.Printf("Ping Response:\n%s\n\n", json)
 
-	joinServer(host, port)
+	joinServer(host, port, window)
 }
 
 func connect(host string, port int) net.Conn {
@@ -69,12 +77,12 @@ func pingServer(host string, port int) string {
 }
 
 type Packet struct {
-	packetId   int
-	pacetSize  int
-	packetData []byte
+	id   int
+	size int
+	data []byte
 }
 
-func joinServer(host string, port int) {
+func joinServer(host string, port int, window *glfw.Window) {
 	conn := connect(host, port)
 	defer conn.Close()
 
@@ -101,28 +109,31 @@ func joinServer(host string, port int) {
 		reader := bufio.NewReader(conn)
 
 		for {
-			packetSize, err := binary.ReadUvarint(reader)
-			checkError(err)
+			size, err := binary.ReadUvarint(reader)
+			if err != nil {
+				fmt.Println("Error reading from connection, returning from reciver. Error: " + err.Error())
+				return
+			}
 
 			// ignore the packet type in the packet length since we read it too
-			packetSize -= 1
+			size -= 1
 
 			packetType, err := binary.ReadUvarint(reader)
 			checkError(err)
 
-			data := make([]byte, packetSize)
+			data := make([]byte, size)
 			n, _ := reader.Read(data)
 
-			for n < int(packetSize) {
+			for n < int(size) {
 				// didn't read all the data, keep trying to read some more
 				nx, _ := reader.Read(data[n:])
 				n += nx
 			}
 
 			var packet Packet
-			packet.packetId = int(packetType)
-			packet.pacetSize = int(packetSize)
-			packet.packetData = data
+			packet.id = int(packetType)
+			packet.size = int(size)
+			packet.data = data
 
 			fromServer <- packet
 		}
@@ -136,26 +147,35 @@ func joinServer(host string, port int) {
 			tickCount += 1
 			fmt.Printf("Tick %d\n", tickCount)
 
-			if tickCount >= 800 {
+			frame(window)
+
+			if tickCount >= 40 {
 				return
 			}
 		case packet := <-fromServer:
-			fmt.Printf("Packet: 0x%0x\t\tsize: %d\n", packet.packetId, packet.pacetSize)
+			fmt.Printf("Packet: 0x%0x\t\tsize: %d\n", packet.id, packet.size)
 
-			switch packet.packetId {
+			switch packet.id {
 			case 0:
-				fmt.Printf("Keep alive: %d\n", packet.packetData)
+				fmt.Printf("Keep alive: %d\n", packet.data)
 
 				// send it right back
 				buf := new(bytes.Buffer)
 
-				writeVarint(buf, 0)               // packet id
-				writeData(buf, packet.packetData) // keep alive id
+				writeVarint(buf, 0)         // packet id
+				writeData(buf, packet.data) // keep alive id
 
 				sendPacket(conn, buf)
 			}
 		}
 	}
+}
+
+func frame(window *glfw.Window) {
+	gl.ClearColor(0.33, 0.33, 0.33, 0.0)
+	gl.Clear(gl.COLOR_BUFFER_BIT)
+
+	window.SwapBuffers()
 }
 
 func sendHandshake(conn net.Conn, host string, port int, state int) {
@@ -189,9 +209,8 @@ func sendLoginStart(conn net.Conn) {
 
 func readStatusRequest(conn net.Conn) string {
 	reader := bufio.NewReader(conn)
-	var err error
 
-	_, err = binary.ReadUvarint(reader)
+	_, err := binary.ReadUvarint(reader)
 	checkError(err)
 
 	_, err = binary.ReadUvarint(reader)
@@ -206,11 +225,8 @@ func readLoginSuccess(reader *bufio.Reader) {
 	_, err = binary.ReadUvarint(reader)
 	checkError(err)
 
-	var packetId uint64
-	packetId, err = binary.ReadUvarint(reader)
-
-	if packetId != 2 {
-		panic("Expected packet id 2 (Login Success), got: " + strconv.Itoa(int(packetId)))
+	if id, _ := binary.ReadUvarint(reader); id != 2 {
+		panic("Expected packet id 2 (Login Success), got: " + strconv.Itoa(int(id)))
 	}
 
 	fmt.Println("Got login success packet!")
