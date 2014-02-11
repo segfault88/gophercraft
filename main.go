@@ -37,6 +37,9 @@ func main() {
 	}
 	defer glfw.Terminate()
 
+	glfw.WindowHint(glfw.VersionMajor, 3)
+	glfw.WindowHint(glfw.VersionMinor, 3)
+
 	window, err := glfw.CreateWindow(800, 600, "Gophercraft!", nil, nil)
 
 	if err != nil {
@@ -149,7 +152,7 @@ func joinServer(host string, port int, window *glfw.Window) {
 
 			frame(window)
 
-			if tickCount >= 40 {
+			if tickCount >= 200 {
 				return
 			}
 		case packet := <-fromServer:
@@ -158,6 +161,12 @@ func joinServer(host string, port int, window *glfw.Window) {
 			switch packet.id {
 			case 0:
 				fmt.Printf("Keep alive: %d\n", packet.data)
+
+				databuffer := bytes.NewBuffer(packet.data)
+				var keepalive int
+				binary.Read(databuffer, binary.BigEndian, &keepalive)
+
+				fmt.Printf("Keepalive was: %d\n", keepalive)
 
 				// send it right back
 				buf := new(bytes.Buffer)
@@ -172,10 +181,11 @@ func joinServer(host string, port int, window *glfw.Window) {
 }
 
 func frame(window *glfw.Window) {
-	gl.ClearColor(0.33, 0.33, 0.33, 0.0)
+	gl.ClearColor(0.2, 0.2, 0.23, 0.0)
 	gl.Clear(gl.COLOR_BUFFER_BIT)
 
 	window.SwapBuffers()
+	glfw.PollEvents()
 }
 
 func sendHandshake(conn net.Conn, host string, port int, state int) {
