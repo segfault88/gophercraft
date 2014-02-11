@@ -184,6 +184,18 @@ func frame(window *glfw.Window) {
 	gl.ClearColor(0.2, 0.2, 0.23, 0.0)
 	gl.Clear(gl.COLOR_BUFFER_BIT)
 
+	var vbo = gl.GenBuffer()
+	vbo.Bind(gl.ARRAY_BUFFER)
+
+	verticies := []float32{
+		0.0, 0.5,
+		0.5, -0.5,
+		-0.5, -0.5}
+
+	gl.BufferData(gl.GLenum(vbo), 24, verticies, gl.STATIC_DRAW)
+
+	vbo.Delete()
+
 	window.SwapBuffers()
 	glfw.PollEvents()
 }
