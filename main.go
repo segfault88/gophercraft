@@ -37,8 +37,9 @@ func main() {
 	}
 	defer glfw.Terminate()
 
-	glfw.WindowHint(glfw.VersionMajor, 3)
-	glfw.WindowHint(glfw.VersionMinor, 3)
+	// glfw.WindowHint(glfw.ContextVersionMajor, 3)
+	// glfw.WindowHint(glfw.ContextVersionMinor, 3)
+	// glfw.WindowHint(glfw.OpenglProfile, glfw.OpenglCoreProfile)
 
 	window, err := glfw.CreateWindow(800, 600, "Gophercraft!", nil, nil)
 
@@ -53,6 +54,63 @@ func main() {
 
 	window.SwapBuffers()
 	defer window.Destroy()
+
+	vertex := `#version 150
+
+in vec2 position;
+
+void main()
+{
+    gl_Position = vec4(position, 0.0, 1.0);
+}`
+
+	vertex_shader := gl.CreateShader(gl.VERTEX_SHADER)
+	vertex_shader.Source(vertex)
+	vertex_shader.Compile()
+	fmt.Println(vertex_shader.GetInfoLog())
+
+	fragment := `#version 150
+
+out vec4 outColor;
+
+void main()
+{
+    outColor = vec4(1.0, 1.0, 1.0, 1.0);
+}`
+
+	fragment_shader := gl.CreateShader(gl.FRAGMENT_SHADER)
+	fragment_shader.Source(fragment)
+	fragment_shader.Compile()
+	fmt.Println(fragment_shader.GetInfoLog())
+
+	program := gl.CreateProgram()
+	program.AttachShader(vertex_shader)
+	program.AttachShader(fragment_shader)
+
+	program.BindFragDataLocation(0, "outColor")
+	program.Link()
+	program.Use()
+
+	positionAttrib := program.GetAttribLocation("position")
+	positionAttrib.AttribPointer(2, gl.FLOAT, false, 0, nil)
+	positionAttrib.EnableArray()
+
+	var vbo = gl.GenBuffer()
+	vbo.Bind(gl.ARRAY_BUFFER)
+
+	verticies := []float32{
+		0.0, 0.5,
+		0.5, -0.5,
+		-0.5, -0.5}
+
+	gl.BufferData(gl.GLenum(vbo), 24, verticies, gl.STATIC_DRAW)
+
+	vertex_array := gl.GenVertexArray()
+	vertex_array.Bind()
+
+	if gl.GetError() != gl.NO_ERROR {
+		panic("Error or something!")
+	}
 
 	host := "localhost"
 	port := 25565
@@ -184,20 +242,11 @@ func frame(window *glfw.Window) {
 	gl.ClearColor(0.2, 0.2, 0.23, 0.0)
 	gl.Clear(gl.COLOR_BUFFER_BIT)
 
-	var vbo = gl.GenBuffer()
-	vbo.Bind(gl.ARRAY_BUFFER)
-
-	verticies := []float32{
-		0.0, 0.5,
-		0.5, -0.5,
-		-0.5, -0.5}
-
-	gl.BufferData(gl.GLenum(vbo), 24, verticies, gl.STATIC_DRAW)
-
-	vbo.Delete()
+	gl.DrawArrays(gl.TRIANGLES, 0, 3)
 
 	window.SwapBuffers()
 	glfw.PollEvents()
+
 }
 
 func sendHandshake(conn net.Conn, host string, port int, state int) {
