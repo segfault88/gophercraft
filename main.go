@@ -6,11 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	// "math"
 	"net"
-	// "os"
-	// "strings"
-	// "encoding/hex"
 	"runtime"
 	"strconv"
 	"time"
@@ -22,46 +18,8 @@ import (
 	"github.com/go-gl/glu"
 )
 
-var (
-	varintBuff [binary.MaxVarintLen64]byte
-)
-
-func main() {
-	// needed for glfw3 not to seg at the moment
-	runtime.LockOSThread()
-
-	fmt.Println("Gophercraft!\n")
-
-	if !glfw.Init() {
-		panic("Can't init glfw3!")
-	}
-	defer glfw.Terminate()
-
-	glfw.WindowHint(glfw.ContextVersionMajor, 3)
-	glfw.WindowHint(glfw.ContextVersionMinor, 3)
-	glfw.WindowHint(glfw.OpenglForwardCompatible, glfw.True)
-	glfw.WindowHint(glfw.OpenglProfile, glfw.OpenglCoreProfile)
-
-	major, minor, revision := glfw.GetVersion()
-	fmt.Printf("OpenGL Version: %d %d %d\n", major, minor, revision)
-
-	window, err := glfw.CreateWindow(800, 600, "Gophercraft!", nil, nil)
-
-	if err != nil {
-		panic(err)
-	}
-
-	window.MakeContextCurrent()
-	glfw.SwapInterval(1)
-
-	gl.Init()
-
-	window.SwapBuffers()
-	defer window.Destroy()
-
-	checkGLerror()
-
-	vertex := `#version 150
+const (
+	vertex = `#version 330
 
 in vec2 position;
 
@@ -70,14 +28,7 @@ void main()
     gl_Position = vec4(position, 0.0, 1.0);
 }`
 
-	vertex_shader := gl.CreateShader(gl.VERTEX_SHADER)
-	vertex_shader.Source(vertex)
-	vertex_shader.Compile()
-	fmt.Println(vertex_shader.GetInfoLog())
-
-	checkGLerror()
-
-	fragment := `#version 150
+	fragment = `#version 330
 
 out vec4 outColor;
 
@@ -85,12 +36,57 @@ void main()
 {
     outColor = vec4(1.0, 1.0, 1.0, 1.0);
 }`
+)
+
+var (
+	varintBuff [binary.MaxVarintLen64]byte
+)
+
+func main() {
+	/// lock glfw/gl calls to a single thread
+	runtime.LockOSThread()
+
+	glfw.Init()
+	defer glfw.Terminate()
+
+	glfw.WindowHint(glfw.ContextVersionMajor, 3)
+	glfw.WindowHint(glfw.ContextVersionMinor, 3)
+	glfw.WindowHint(glfw.OpenglForwardCompatible, glfw.True)
+	glfw.WindowHint(glfw.OpenglProfile, glfw.OpenglCoreProfile)
+
+	window, err := glfw.CreateWindow(800, 600, "Example", nil, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	defer window.Destroy()
+
+	window.MakeContextCurrent()
+	glfw.SwapInterval(1)
+
+	gl.Init()
+
+	vao := gl.GenVertexArray()
+	vao.Bind()
+
+	vbo := gl.GenBuffer()
+	vbo.Bind(gl.ARRAY_BUFFER)
+
+	verticies := []float32{0, 1, 0, -1, -1, 0, 1, -1, 0}
+
+	gl.BufferData(gl.ARRAY_BUFFER, len(verticies)*4, verticies, gl.STATIC_DRAW)
+
+	vertex_shader := gl.CreateShader(gl.VERTEX_SHADER)
+	vertex_shader.Source(vertex)
+	vertex_shader.Compile()
+	fmt.Println(vertex_shader.GetInfoLog())
+	defer vertex_shader.Delete()
 
 	fragment_shader := gl.CreateShader(gl.FRAGMENT_SHADER)
 	fragment_shader.Source(fragment)
 	fragment_shader.Compile()
 	fmt.Println(fragment_shader.GetInfoLog())
-	checkGLerror()
+	defer fragment_shader.Delete()
 
 	program := gl.CreateProgram()
 	program.AttachShader(vertex_shader)
@@ -99,29 +95,12 @@ void main()
 	program.BindFragDataLocation(0, "outColor")
 	program.Link()
 	program.Use()
+	defer program.Delete()
 
 	positionAttrib := program.GetAttribLocation("position")
-	positionAttrib.AttribPointer(2, gl.FLOAT, false, 0, nil)
+	positionAttrib.AttribPointer(3, gl.FLOAT, false, 0, nil)
 	positionAttrib.EnableArray()
-
-	checkGLerror()
-
-	var vbo = gl.GenBuffer()
-	vbo.Bind(gl.ARRAY_BUFFER)
-
-	verticies := []float32{
-		0.0, 0.5,
-		0.5, -0.5,
-		-0.5, -0.5}
-
-	gl.BufferData(gl.GLenum(vbo), 24, verticies, gl.STATIC_DRAW)
-
-	checkGLerror()
-
-	vertex_array := gl.GenVertexArray()
-	vertex_array.Bind()
-
-	checkGLerror()
+	defer positionAttrib.DisableArray()
 
 	host := "localhost"
 	port := 25565
