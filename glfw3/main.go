@@ -58,10 +58,7 @@ func main() {
 	vbo := gl.GenBuffer()
 	vbo.Bind(gl.ARRAY_BUFFER)
 
-	verticies := []float32{
-		0.0, 0.5,
-		0.5, -0.5,
-		-0.5, -0.5}
+	verticies := []float32{0, 1, 0, -1, -1, 0, 1, -1, 0}
 
 	gl.BufferData(gl.ARRAY_BUFFER, len(verticies)*4, verticies, gl.STATIC_DRAW)
 
@@ -89,17 +86,20 @@ func main() {
 	positionAttrib := program.GetAttribLocation("position")
 	positionAttrib.AttribPointer(3, gl.FLOAT, false, 0, nil)
 	positionAttrib.EnableArray()
+	defer positionAttrib.DisableArray()
 
 	gl.ClearColor(0.3, 0.3, 0.3, 1.0)
 
-	// keep the window open for a short time only
-	for i := 0; i < 250; i += 1 {
+	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-
 		gl.DrawArrays(gl.TRIANGLES, 0, 3)
 
 		window.SwapBuffers()
 		glfw.PollEvents()
+
+		if window.GetKey(glfw.KeyEscape) == glfw.Press {
+			window.SetShouldClose(true)
+		}
 	}
 }
 
