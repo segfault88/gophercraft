@@ -2,17 +2,14 @@ package main
 
 import (
 	"fmt"
-	"runtime"
-)
-
-import (
 	"github.com/go-gl/gl"
 	glfw "github.com/go-gl/glfw3"
 	"github.com/go-gl/glu"
+	"runtime"
 )
 
 const (
-	vertex = `#version 150
+	vertex = `#version 330
 
 in vec2 position;
 
@@ -21,7 +18,7 @@ void main()
     gl_Position = vec4(position, 0.0, 1.0);
 }`
 
-	fragment = `#version 150
+	fragment = `#version 330
 
 out vec4 outColor;
 
@@ -43,7 +40,7 @@ func main() {
 	glfw.WindowHint(glfw.OpenglForwardCompatible, glfw.True)
 	glfw.WindowHint(glfw.OpenglProfile, glfw.OpenglCoreProfile)
 
-	window, err := glfw.CreateWindow(800, 600, "Gophercraft!", nil, nil)
+	window, err := glfw.CreateWindow(800, 600, "Example", nil, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -55,17 +52,6 @@ func main() {
 
 	gl.Init()
 
-	loop(window)
-}
-
-func checkGLerror() {
-	if glerr := gl.GetError(); glerr != gl.NO_ERROR {
-		string, _ := glu.ErrorString(glerr)
-		panic(string)
-	}
-}
-
-func loop(window *glfw.Window) {
 	vao := gl.GenVertexArray()
 	vao.Bind()
 
@@ -104,14 +90,22 @@ func loop(window *glfw.Window) {
 	positionAttrib.AttribPointer(3, gl.FLOAT, false, 0, nil)
 	positionAttrib.EnableArray()
 
-	gl.ClearColor(0.2, 0.2, 0.23, 1.0)
+	gl.ClearColor(0.3, 0.3, 0.3, 1.0)
 
+	// keep the window open for a short time only
 	for i := 0; i < 250; i += 1 {
-		gl.Clear(gl.COLOR_BUFFER_BIT) // | gl.DEPTH_BUFFER_BIT)
+		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 		gl.DrawArrays(gl.TRIANGLES, 0, 3)
 
 		window.SwapBuffers()
 		glfw.PollEvents()
+	}
+}
+
+func checkGLerror() {
+	if glerr := gl.GetError(); glerr != gl.NO_ERROR {
+		string, _ := glu.ErrorString(glerr)
+		panic(string)
 	}
 }
