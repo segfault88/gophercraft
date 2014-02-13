@@ -19,7 +19,7 @@ import (
 import (
 	"github.com/go-gl/gl"
 	glfw "github.com/go-gl/glfw3"
-	_ "github.com/go-gl/glu"
+	"github.com/go-gl/glu"
 )
 
 var (
@@ -37,9 +37,13 @@ func main() {
 	}
 	defer glfw.Terminate()
 
-	// glfw.WindowHint(glfw.ContextVersionMajor, 3)
-	// glfw.WindowHint(glfw.ContextVersionMinor, 3)
-	// glfw.WindowHint(glfw.OpenglProfile, glfw.OpenglCoreProfile)
+	glfw.WindowHint(glfw.ContextVersionMajor, 3)
+	glfw.WindowHint(glfw.ContextVersionMinor, 0)
+	glfw.WindowHint(glfw.OpenglForwardCompatible, gl.TRUE)
+	glfw.WindowHint(glfw.OpenglProfile, glfw.OpenglCoreProfile)
+
+	major, minor, revision := glfw.GetVersion()
+	fmt.Printf("OpenGL Version: %d %d %d\n", major, minor, revision)
 
 	window, err := glfw.CreateWindow(800, 600, "Gophercraft!", nil, nil)
 
@@ -55,7 +59,9 @@ func main() {
 	window.SwapBuffers()
 	defer window.Destroy()
 
-	vertex := `#version 150
+	checkGLerror()
+
+	vertex := `#version 130
 
 in vec2 position;
 
@@ -69,7 +75,9 @@ void main()
 	vertex_shader.Compile()
 	fmt.Println(vertex_shader.GetInfoLog())
 
-	fragment := `#version 150
+	checkGLerror()
+
+	fragment := `#version 130
 
 out vec4 outColor;
 
@@ -82,6 +90,7 @@ void main()
 	fragment_shader.Source(fragment)
 	fragment_shader.Compile()
 	fmt.Println(fragment_shader.GetInfoLog())
+	checkGLerror()
 
 	program := gl.CreateProgram()
 	program.AttachShader(vertex_shader)
@@ -95,6 +104,8 @@ void main()
 	positionAttrib.AttribPointer(2, gl.FLOAT, false, 0, nil)
 	positionAttrib.EnableArray()
 
+	checkGLerror()
+
 	var vbo = gl.GenBuffer()
 	vbo.Bind(gl.ARRAY_BUFFER)
 
@@ -105,12 +116,12 @@ void main()
 
 	gl.BufferData(gl.GLenum(vbo), 24, verticies, gl.STATIC_DRAW)
 
+	checkGLerror()
+
 	vertex_array := gl.GenVertexArray()
 	vertex_array.Bind()
 
-	if gl.GetError() != gl.NO_ERROR {
-		panic("Error or something!")
-	}
+	checkGLerror()
 
 	host := "localhost"
 	port := 25565
@@ -119,6 +130,13 @@ void main()
 	fmt.Printf("Ping Response:\n%s\n\n", json)
 
 	joinServer(host, port, window)
+}
+
+func checkGLerror() {
+	if glerr := gl.GetError(); glerr != gl.NO_ERROR {
+		string, _ := glu.ErrorString(glerr)
+		panic(string)
+	}
 }
 
 func connect(host string, port int) net.Conn {
