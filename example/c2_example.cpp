@@ -3,6 +3,7 @@
 
 // Headers
 #include <GL/glew.h>
+#include <SFML/OpenGL.hpp>
 #include <SFML/Window.hpp>
 #include <iostream>
 
@@ -22,16 +23,27 @@ const GLchar* fragmentSource =
 
 int main()
 {
-    sf::Window window(sf::VideoMode(800, 600, 32), "OpenGL", sf::Style::Titlebar | sf::Style::Close);
+    sf::ContextSettings settings;
+    settings.depthBits = 24;
+    settings.stencilBits = 8;
+    settings.antialiasingLevel = 4;
+    settings.majorVersion = 3;
+    settings.minorVersion = 3;
+
+    sf::Window window(sf::VideoMode(800, 600, 32), "OpenGL", sf::Style::Titlebar | sf::Style::Close, settings);
     
     // Initialize GLEW
     glewExperimental = GL_TRUE;
     glewInit();
 
+
+
     // Create Vertex Array Object
     GLuint vao;
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
+
+    std::cout << "GL error: " << gluErrorString(glGetError()) << std::endl;
 
     // Create a Vertex Buffer Object and copy the vertex data to it
     GLuint vbo;
@@ -46,15 +58,27 @@ int main()
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
+
+
     // Create and compile the vertex shader
     GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vertexSource, NULL);
     glCompileShader(vertexShader);
 
+    char buffer[512];
+    glGetShaderInfoLog(vertexShader, 512, NULL, buffer);
+    std::cout << "Shader compile output: " << buffer << std::endl;
+
     // Create and compile the fragment shader
     GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragmentShader, 1, &fragmentSource, NULL);
     glCompileShader(fragmentShader);
+
+    char buffer2[512];
+    glGetShaderInfoLog(vertexShader, 512, NULL, buffer2);
+    std::cout << "Shader compile output: " << buffer2 << std::endl;
+
+    
 
     // Link the vertex and fragment shader into a shader program
     GLuint shaderProgram = glCreateProgram();

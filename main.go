@@ -38,7 +38,7 @@ func main() {
 	defer glfw.Terminate()
 
 	glfw.WindowHint(glfw.ContextVersionMajor, 3)
-	glfw.WindowHint(glfw.ContextVersionMinor, 0)
+	glfw.WindowHint(glfw.ContextVersionMinor, 3)
 	glfw.WindowHint(glfw.OpenglForwardCompatible, gl.TRUE)
 	glfw.WindowHint(glfw.OpenglProfile, glfw.OpenglCoreProfile)
 
@@ -61,7 +61,7 @@ func main() {
 
 	checkGLerror()
 
-	vertex := `#version 130
+	vertex := `#version 150
 
 in vec2 position;
 
@@ -77,7 +77,7 @@ void main()
 
 	checkGLerror()
 
-	fragment := `#version 130
+	fragment := `#version 150
 
 out vec4 outColor;
 
