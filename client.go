@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"compress/flate"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -194,7 +195,38 @@ func ParseMapChunkBulk(packet *Packet) error {
 	binary.Read(packet.Data, binary.BigEndian, &dataLength)
 	binary.Read(packet.Data, binary.BigEndian, &skyLightSent)
 
-	fmt.Printf("\n\n** Map Chunk: column count: %d, dataLenght: %d, skyLightSent: %s\n\n", chunkColumnCount, dataLength, boolToString(skyLightSent))
+	fmt.Printf("\n\n** Map Chunk: column count: %d, dataLenght: %d, skyLightSent: %s", chunkColumnCount, dataLength, boolToString(skyLightSent))
+
+	compressedData := make([]byte, dataLength)
+	var n int32 = 0
+
+	for n < dataLength {
+		nx, _ := packet.Data.Read(compressedData[n:])
+		n += int32(nx)
+	}
+
+	fmt.Println("Going to try to deflate")
+
+	closer := flate.NewReader(bytes.NewBuffer(compressedData))
+
+	buffer := make([]byte, 2048)
+	nc, err := closer.Read(buffer)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Deflated: %d", buffer)
+
+	for nc > 0 {
+		nc, err = closer.Read(buffer)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("Deflated: %d", buffer)
+	}
+
+	fmt.Println("Deflate done.")
+
+	closer.Close()
 
 	return nil
 }
