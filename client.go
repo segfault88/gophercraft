@@ -3,12 +3,13 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"compress/flate"
+	"compress/zlib"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"strconv"
 )
 
@@ -195,7 +196,7 @@ func ParseMapChunkBulk(packet *Packet) error {
 	binary.Read(packet.Data, binary.BigEndian, &dataLength)
 	binary.Read(packet.Data, binary.BigEndian, &skyLightSent)
 
-	fmt.Printf("\n\n** Map Chunk: column count: %d, dataLenght: %d, skyLightSent: %s", chunkColumnCount, dataLength, boolToString(skyLightSent))
+	fmt.Printf("\n\n** Map Chunk: column count: %d, dataLenght: %d, skyLightSent: %s\n", chunkColumnCount, dataLength, boolToString(skyLightSent))
 
 	compressedData := make([]byte, dataLength)
 	var n int32 = 0
@@ -205,16 +206,26 @@ func ParseMapChunkBulk(packet *Packet) error {
 		n += int32(nx)
 	}
 
-	fmt.Println("Going to try to deflate")
+	f, err := os.Create("chunk.bin")
+	f.Write(compressedData)
+	f.Close()
 
-	closer := flate.NewReader(bytes.NewBuffer(compressedData))
+	fmt.Printf("Going to try to deflate - size %d should be %d\n", len(compressedData), dataLength)
 
-	buffer := make([]byte, 2048)
+	closer, err := zlib.NewReader(bytes.NewBuffer(compressedData))
+
+	// fo, err := os.Create("chunk2.bin")
+
+	// io.Copy(fo, closer)
+	// fo.Close()
+	// closer.Close()
+
+	buffer := make([]byte, 16386)
 	nc, err := closer.Read(buffer)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Deflated: %d", buffer)
+	fmt.Printf("Deflated: %d", buffer[:n])
 
 	for nc > 0 {
 		nc, err = closer.Read(buffer)
