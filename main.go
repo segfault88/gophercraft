@@ -1,9 +1,10 @@
-package gophercraft
+package main
 
 import (
 	"encoding/binary"
 	"fmt"
 	"runtime"
+	"time"
 )
 
 import (
@@ -34,9 +35,13 @@ void main()
 
 var (
 	varintBuff [binary.MaxVarintLen64]byte
+	host       = "localhost"
+	port       = 25565
 )
 
 func main() {
+	fmt.Println("Gophercraft!\n")
+
 	/// lock glfw/gl calls to a single thread
 	runtime.LockOSThread()
 
@@ -96,19 +101,42 @@ func main() {
 	positionAttrib.EnableArray()
 	defer positionAttrib.DisableArray()
 
-	host := "localhost"
-	port := 25565
+	json, err := Ping(host, port)
 
-	json := pingServer(host, port)
+	if err != nil {
+		fmt.Printf("ERROR: Couldn't ping minecraft server! Info: %s", err)
+	}
+
 	fmt.Printf("Ping Response:\n%s\n\n", json)
 
 	joinServer(host, port, window)
+
+	run(window)
 }
 
 func checkGLerror() {
 	if glerr := gl.GetError(); glerr != gl.NO_ERROR {
 		string, _ := glu.ErrorString(glerr)
 		panic(string)
+	}
+}
+
+func run(window *glfw.Window) {
+	// start the tick goroutine
+	tick := make(chan bool)
+	go tick_run(20, tick)
+
+	// open the window draw a frame
+	frame(window)
+
+}
+
+func tick_run(everyMS int, tick chan bool) {
+	sleepTime := time.Duration(everyMS) * time.Millisecond
+
+	for {
+		time.Sleep(sleepTime)
+		tick <- true
 	}
 }
 
