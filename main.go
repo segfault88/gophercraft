@@ -129,8 +129,10 @@ func run(window *glfw.Window, client *Client) {
 	tick := make(chan bool)
 	go tick_run(20, tick)
 
-	// open the window draw a frame
-	frame(window)
+	// open the window draw 10 frames, hopefully glfw settles down a little
+	for i := 0; i < 10; i++ {
+		frame(window)
+	}
 
 	for !window.ShouldClose() {
 		select {
