@@ -11,17 +11,14 @@ import (
 	"strconv"
 )
 
-import (
-	// "github.com/go-gl/gl"
-	glfw "github.com/go-gl/glfw3"
-	// "github.com/go-gl/glu"
-)
-
 type Client struct {
-	Host   string
-	Port   int
-	conn   *net.Conn
-	reader *bufio.Reader
+	Host     string
+	Port     int
+	conn     *net.Conn
+	reader   *bufio.Reader
+	Uuid     string
+	Username string
+	packets  chan *Packet
 }
 
 type Packet struct {
@@ -32,10 +29,10 @@ type Packet struct {
 
 func Ping(host string, port int) (string, error) {
 	client := Client{Host: host, Port: port}
-	err := client.connect()
 
 	fmt.Printf("Going to ping server %s:%d\n", host, port)
 
+	err := client.connect()
 	if err != nil {
 		return "", err
 	}
@@ -45,9 +42,12 @@ func Ping(host string, port int) (string, error) {
 	client.SendHandshake(1)
 	client.SendStatusRequest()
 
-	packet := readPacket(client.reader)
+	packet, err := readPacket(client.reader)
+	if err != nil {
+		return "", err
+	}
 
-	return parseStatusRequest(packet)
+	return ParseStatusRequest(packet)
 }
 
 func (client *Client) connect() error {
@@ -69,102 +69,51 @@ func (client *Client) disconnect() {
 	(*client.conn).Close()
 }
 
-func joinServer(host string, port int, window *glfw.Window) {
-	_ = host
-	_ = port
-	_ = window
-	// conn := connect(host, port)
-	// defer conn.Close()
+func JoinServer(host string, port int) (*Client, error) {
+	client := Client{Host: host, Port: port}
+	fmt.Printf("Going to join server %s:%s\n", host, port)
 
-	// fmt.Println("Going to join server")
+	err := client.connect()
+	if err != nil {
+		return nil, err
+	}
 
-	// sendHandshake(conn, host, port, 2)
-	// sendLoginStart(conn)
+	client.SendHandshake(2)
+	client.SendLoginStart()
 
-	// tick := make(chan bool)
+	packet, err := readPacket(client.reader)
+	if err != nil {
+		(*client.conn).Close()
+		return nil, err
+	}
 
-	// go func() {
-	// 	for {
-	// 		time.Sleep(40 * time.Millisecond)
-	// 		tick <- true
-	// 	}
-	// }()
+	client.Username, client.Uuid, err = ParseLoginSuccess(packet)
 
-	// reader := bufio.NewReader(conn)
-	// readLoginSuccess(reader)
+	if err != nil {
+		(*client.conn).Close()
+		return nil, err
+	}
 
-	// fromServer := make(chan Packet)
+	client.packets = make(chan *Packet)
+	go client.packetReader()
 
-	// go func() {
-	// 	reader := bufio.NewReader(conn)
+	return &client, nil
+}
 
-	// 	for {
-	// 		size, err := binary.ReadUvarint(reader)
-	// 		if err != nil {
-	// 			fmt.Println("Error reading from connection, returning from reciver. Error: " + err.Error())
-	// 			return
-	// 		}
+func (client *Client) packetReader() {
+	for {
+		packet, err := readPacket(client.reader)
 
-	// 		// ignore the packet type in the packet length since we read it too
-	// 		size -= 1
+		if err != nil {
+			fmt.Printf("ERROR: couldn't read packet: %s\n", err.Error())
+		}
 
-	// 		packetType, err := binary.ReadUvarint(reader)
-	// 		checkError(err)
+		client.packets <- packet
+	}
+}
 
-	// 		data := make([]byte, size)
-	// 		n, _ := reader.Read(data)
-
-	// 		for n < int(size) {
-	// 			// didn't read all the data, keep trying to read some more
-	// 			nx, _ := reader.Read(data[n:])
-	// 			n += nx
-	// 		}
-
-	// 		var packet Packet
-	// 		packet.id = int(packetType)
-	// 		packet.size = int(size)
-	// 		packet.data = data
-
-	// 		fromServer <- packet
-	// 	}
-	// }()
-
-	// tickCount := 0
-
-	// for {
-	// 	select {
-	// 	case <-tick:
-	// 		tickCount += 1
-	// 		fmt.Printf("Tick %d\n", tickCount)
-
-	// 		frame(window)
-
-	// 		if tickCount >= 200 {
-	// 			return
-	// 		}
-	// 	case packet := <-fromServer:
-	// 		fmt.Printf("Packet: 0x%0x\t\tsize: %d\n", packet.id, packet.size)
-
-	// 		switch packet.id {
-	// 		case 0:
-	// 			fmt.Printf("Keep alive: %d\n", packet.data)
-
-	// 			databuffer := bytes.NewBuffer(packet.data)
-	// 			var keepalive int
-	// 			binary.Read(databuffer, binary.BigEndian, &keepalive)
-
-	// 			fmt.Printf("Keepalive was: %d\n", keepalive)
-
-	// 			// send it right back
-	// 			buf := new(bytes.Buffer)
-
-	// 			writeVarint(buf, 0)         // packet id
-	// 			writeData(buf, packet.data) // keep alive id
-
-	// 			sendPacket(conn, buf)
-	// 		}
-	// 	}
-	// }
+func (client *Client) Shutdown() {
+	(*client.conn).Close()
 }
 
 func (client *Client) SendHandshake(state int) {
@@ -187,20 +136,29 @@ func (client *Client) SendStatusRequest() {
 	sendPacket(*client.conn, buf)
 }
 
-func sendLoginStart(conn net.Conn) {
+func (client *Client) SendLoginStart() {
 	buf := new(bytes.Buffer)
 
 	writeVarint(buf, 0)             // packet id
 	writeString(buf, "gophercraft") // username
 
-	sendPacket(conn, buf)
+	sendPacket(*client.conn, buf)
 }
 
-func parseStatusRequest(packet *Packet) (string, error) {
+func (client *Client) SendKeepAlive(keepalive int32) {
+	buf := new(bytes.Buffer)
+
+	writeVarint(buf, 0)       // packet id
+	writeData(buf, keepalive) // keepalive
+
+	sendPacket(*client.conn, buf)
+}
+
+func ParseStatusRequest(packet *Packet) (string, error) {
 	return readString(packet.Data), nil
 }
 
-func parseLoginSuccess(packet *Packet) (username string, uuid string, err error) {
+func ParseLoginSuccess(packet *Packet) (username string, uuid string, err error) {
 	if packet.Id != 2 {
 		return "", "", errors.New("Expected packet id 2 (Login Success), but got: " + strconv.Itoa(int(packet.Id)))
 	}
@@ -214,6 +172,31 @@ func parseLoginSuccess(packet *Packet) (username string, uuid string, err error)
 	fmt.Printf("Username: %s\n", username)
 
 	return
+}
+
+func ParseKeepalive(packet *Packet) (int32, error) {
+	var keepalive int32
+	err := binary.Read(packet.Data, binary.BigEndian, &keepalive)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return keepalive, nil
+}
+
+func ParseMapChunkBulk(packet *Packet) error {
+	var chunkColumnCount int16
+	var dataLength int32
+	var skyLightSent bool
+
+	binary.Read(packet.Data, binary.BigEndian, &chunkColumnCount)
+	binary.Read(packet.Data, binary.BigEndian, &dataLength)
+	binary.Read(packet.Data, binary.BigEndian, &skyLightSent)
+
+	fmt.Printf("\n\n** Map Chunk: column count: %d, dataLenght: %d, skyLightSent: %s\n\n", chunkColumnCount, dataLength, boolToString(skyLightSent))
+
+	return nil
 }
 
 func writeVarint(w io.Writer, varint int64) error {
@@ -259,11 +242,11 @@ func sendPacket(w io.Writer, buf *bytes.Buffer) {
 	sendBuffer.Flush()
 }
 
-func readPacket(reader *bufio.Reader) (packet *Packet) {
+func readPacket(reader *bufio.Reader) (*Packet, error) {
 	size, err := binary.ReadUvarint(reader)
 	if err != nil {
 		fmt.Println("Error reading from connection, returning from reciver. Error: " + err.Error())
-		return
+		return nil, err
 	}
 
 	// ignore the packet type in the packet length since we read it too
@@ -281,5 +264,13 @@ func readPacket(reader *bufio.Reader) (packet *Packet) {
 		n += nx
 	}
 
-	return &Packet{Id: int(packetType), Size: int(size), Data: bytes.NewBuffer(data)}
+	return &Packet{Id: int(packetType), Size: int(size), Data: bytes.NewBuffer(data)}, nil
+}
+
+func boolToString(what bool) string {
+	if what {
+		return "True"
+	} else {
+		return "False"
+	}
 }

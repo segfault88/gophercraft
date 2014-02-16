@@ -42,6 +42,10 @@ var (
 func main() {
 	fmt.Println("Gophercraft!\n")
 
+	// ping the minecraft server to see if it is there before moving further
+	json, err := Ping(host, port)
+	fmt.Printf("Ping Response:\n%s\n", json)
+
 	/// lock glfw/gl calls to a single thread
 	runtime.LockOSThread()
 
@@ -101,17 +105,16 @@ func main() {
 	positionAttrib.EnableArray()
 	defer positionAttrib.DisableArray()
 
-	json, err := Ping(host, port)
+	gl.ClearColor(0.2, 0.2, 0.23, 0.0)
 
+	client, err := JoinServer(host, port)
 	if err != nil {
-		fmt.Printf("ERROR: Couldn't ping minecraft server! Info: %s", err)
+		panic(err)
 	}
 
-	fmt.Printf("Ping Response:\n%s\n\n", json)
+	defer client.Shutdown()
 
-	joinServer(host, port, window)
-
-	run(window)
+	run(window, client)
 }
 
 func checkGLerror() {
@@ -121,13 +124,22 @@ func checkGLerror() {
 	}
 }
 
-func run(window *glfw.Window) {
+func run(window *glfw.Window, client *Client) {
 	// start the tick goroutine
 	tick := make(chan bool)
 	go tick_run(20, tick)
 
 	// open the window draw a frame
 	frame(window)
+
+	for !window.ShouldClose() {
+		select {
+		case <-tick:
+			frame(window)
+		case packet := <-client.packets:
+			handlePacket(client, packet)
+		}
+	}
 
 }
 
@@ -141,14 +153,39 @@ func tick_run(everyMS int, tick chan bool) {
 }
 
 func frame(window *glfw.Window) {
-	gl.ClearColor(0.2, 0.2, 0.23, 0.0)
 	gl.Clear(gl.COLOR_BUFFER_BIT)
-
 	gl.DrawArrays(gl.TRIANGLES, 0, 3)
 
 	window.SwapBuffers()
 	glfw.PollEvents()
 
+	if window.GetKey(glfw.KeyEscape) == glfw.Press {
+		window.SetShouldClose(true)
+	}
+}
+
+func handlePacket(client *Client, packet *Packet) {
+	switch packet.Id {
+	case 0x0:
+		keepalive, err := ParseKeepalive(packet)
+
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Printf("Keepalive was: %d\n", keepalive)
+
+		client.SendKeepAlive(keepalive)
+	case 0x26:
+		err := ParseMapChunkBulk(packet)
+
+		if err != nil {
+			panic(err)
+		}
+
+	default:
+		fmt.Printf("Packet: 0x%0x\tsize: %d\tnot handled\n", packet.Id, packet.Size)
+	}
 }
 
 func checkError(err error) {
