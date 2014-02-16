@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"compress/zlib"
+	// "compress/zlib"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -206,38 +206,113 @@ func ParseMapChunkBulk(packet *Packet) error {
 		n += int32(nx)
 	}
 
-	f, err := os.Create("chunk.bin")
+	f, _ := os.Create("chunk.bin")
 	f.Write(compressedData)
 	f.Close()
 
-	fmt.Printf("Going to try to deflate - size %d should be %d\n", len(compressedData), dataLength)
+	// deflate not working at all, disabling for now
+	fmt.Printf("Skipping trying to decompress for now - size %d should be %d\n", len(compressedData), dataLength)
 
-	closer, err := zlib.NewReader(bytes.NewBuffer(compressedData))
+	// closer, err := zlib.NewReader(bytes.NewBuffer(compressedData))
 
-	// fo, err := os.Create("chunk2.bin")
+	// // // fo, err := os.Create("chunk2.bin")
 
-	// io.Copy(fo, closer)
-	// fo.Close()
+	// // // io.Copy(fo, closer)
+	// // // fo.Close()
+	// // // closer.Close()
+
+	// buffer := make([]byte, 16386)
+	// nc, err := closer.Read(buffer)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// fmt.Printf("Deflated: %d", buffer[:n])
+
+	// for nc > 0 {
+	// 	nc, err = closer.Read(buffer)
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// 	fmt.Printf("Deflated: %d", buffer)
+	// }
+
+	// fmt.Println("Deflate done.")
+
 	// closer.Close()
 
-	buffer := make([]byte, 16386)
-	nc, err := closer.Read(buffer)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("Deflated: %d", buffer[:n])
+	return nil
+}
 
-	for nc > 0 {
-		nc, err = closer.Read(buffer)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Printf("Deflated: %d", buffer)
-	}
+func ParseJoinGame(packet *Packet) error {
+	var entityId int32
+	var gameMode byte
+	var dimension byte
+	var difficulty byte
+	var maxPlayers byte
+	var levelType string
 
-	fmt.Println("Deflate done.")
+	binary.Read(packet.Data, binary.BigEndian, &entityId)
+	binary.Read(packet.Data, binary.BigEndian, &gameMode)
+	binary.Read(packet.Data, binary.BigEndian, &dimension)
+	binary.Read(packet.Data, binary.BigEndian, &difficulty)
+	binary.Read(packet.Data, binary.BigEndian, &maxPlayers)
+	levelType = readString(packet.Data)
 
-	closer.Close()
+	fmt.Printf("Got Join Game Packet entityId: %d, gameMode: %d, dimension: %d, difficulty: %d, maxPlayers: %d, levelType: %s\n",
+		entityId, gameMode, dimension, difficulty, maxPlayers, levelType)
+
+	return nil
+}
+
+func ParsePlayerAbilities(packet *Packet) error {
+	var flags byte
+	var flyingSpeed float32
+	var walkingSpeed float32
+
+	binary.Read(packet.Data, binary.BigEndian, &flags)
+	binary.Read(packet.Data, binary.BigEndian, &flyingSpeed)
+	binary.Read(packet.Data, binary.BigEndian, &walkingSpeed)
+
+	fmt.Printf("Got Player Abilities Packet flags: %d, flyingSpeed: %f, walkingSpeed %f\n", flags, flyingSpeed, walkingSpeed)
+
+	return nil
+}
+
+func ParseItemHeldChange(packet *Packet) error {
+	var slot int16
+
+	binary.Read(packet.Data, binary.BigEndian, &slot)
+
+	fmt.Printf("Got Item Held Change, slot: %d\n", slot)
+
+	return nil
+}
+
+func ParsePlayerPositionAndLook(packet *Packet) error {
+	var x, y, z float64
+	var yaw, pitch float32
+	var onGround bool
+
+	binary.Read(packet.Data, binary.BigEndian, &x)
+	binary.Read(packet.Data, binary.BigEndian, &y)
+	binary.Read(packet.Data, binary.BigEndian, &z)
+	binary.Read(packet.Data, binary.BigEndian, &yaw)
+	binary.Read(packet.Data, binary.BigEndian, &pitch)
+	binary.Read(packet.Data, binary.BigEndian, &onGround)
+
+	fmt.Printf("Got Player Position and Look x: %f, y: %f, z: %f, yaw: %f, pitch: %f, onGround: %s\n", x, y, z, yaw, pitch, boolToString(onGround))
+
+	return nil
+}
+
+func ParseTimeUpdate(packet *Packet) error {
+	var ageOfWorld int64
+	var timeOfDay int64
+
+	binary.Read(packet.Data, binary.BigEndian, &ageOfWorld)
+	binary.Read(packet.Data, binary.BigEndian, &timeOfDay)
+
+	fmt.Printf("Got Time Update Age of world: %d, time of day: %d\n", ageOfWorld, timeOfDay)
 
 	return nil
 }

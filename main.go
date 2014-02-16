@@ -175,14 +175,24 @@ func handlePacket(client *Client, packet *Packet) {
 
 		fmt.Printf("Keepalive was: %d\n", keepalive)
 
+		// send it right back
 		client.SendKeepAlive(keepalive)
+	case 0x01:
+		ParseJoinGame(packet)
+	case 0x03:
+		ParseTimeUpdate(packet)
+	case 0x08:
+		ParsePlayerPositionAndLook(packet)
+	case 0x09:
+		ParseItemHeldChange(packet)
 	case 0x26:
 		err := ParseMapChunkBulk(packet)
 
 		if err != nil {
 			panic(err)
 		}
-
+	case 0x39:
+		ParsePlayerAbilities(packet)
 	default:
 		fmt.Printf("Packet: 0x%0x\tsize: %d\tnot handled\n", packet.Id, packet.Size)
 	}
