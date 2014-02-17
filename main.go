@@ -3,34 +3,10 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	glfw "github.com/go-gl/glfw3"
+	"github.com/segfault88/gophercraft/graphics"
 	"runtime"
 	"time"
-)
-
-import (
-	"github.com/go-gl/gl"
-	glfw "github.com/go-gl/glfw3"
-	"github.com/go-gl/glu"
-)
-
-const (
-	vertex = `#version 330
-
-in vec2 position;
-
-void main()
-{
-    gl_Position = vec4(position, 0.0, 1.0);
-}`
-
-	fragment = `#version 330
-
-out vec4 outColor;
-
-void main()
-{
-    outColor = vec4(1.0, 1.0, 1.0, 1.0);
-}`
 )
 
 var (
@@ -38,16 +14,12 @@ var (
 	host       = "localhost"
 	port       = 25565
 
-	vertex_shader   gl.Shader
-	fragment_shader gl.Shader
+	renderer *graphics.Renderer
+	client   *Client
 )
 
 func main() {
 	fmt.Println("Gophercraft!\n")
-
-	// ping the minecraft server to see if it is there before moving further
-	json, err := Ping(host, port)
-	fmt.Printf("Ping Response:\n%s\n", json)
 
 	/// lock glfw/gl calls to a single thread
 	runtime.LockOSThread()
@@ -55,99 +27,34 @@ func main() {
 	if !glfw.Init() {
 		panic("Couldn't init GLFW3")
 	}
-	defer glfw.Terminate()
 
-	glfw.WindowHint(glfw.ContextVersionMajor, 3)
-	glfw.WindowHint(glfw.ContextVersionMinor, 3)
-	glfw.WindowHint(glfw.OpenglForwardCompatible, glfw.True)
-	glfw.WindowHint(glfw.OpenglProfile, glfw.OpenglCoreProfile)
+	// ping the minecraft server to see if it is there before moving further
+	json, err := Ping(host, port)
+	fmt.Printf("Ping Response:\n%s\n", json)
 
-	window, err := glfw.CreateWindow(800, 600, "Example", nil, nil)
+	renderer = graphics.Init()
+	defer renderer.Shutdown()
+
+	client, err = JoinServer(host, port)
 	if err != nil {
 		panic(err)
 	}
-
-	defer window.Destroy()
-
-	window.MakeContextCurrent()
-	glfw.SwapInterval(1)
-
-	gl.Init()
-
-	vao := gl.GenVertexArray()
-	vao.Bind()
-
-	vbo := gl.GenBuffer()
-	vbo.Bind(gl.ARRAY_BUFFER)
-
-	verticies := []float32{0, 1, 0, -1, -1, 0, 1, -1, 0}
-
-	gl.BufferData(gl.ARRAY_BUFFER, len(verticies)*4, verticies, gl.STATIC_DRAW)
-
-	vertex_shader = gl.CreateShader(gl.VERTEX_SHADER)
-	vertex_shader.Source(vertex)
-	vertex_shader.Compile()
-	fmt.Println(vertex_shader.GetInfoLog())
-	defer vertex_shader.Delete()
-
-	fragment_shader = gl.CreateShader(gl.FRAGMENT_SHADER)
-	fragment_shader.Source(fragment)
-	fragment_shader.Compile()
-	fmt.Println(fragment_shader.GetInfoLog())
-	defer fragment_shader.Delete()
-
-	program := gl.CreateProgram()
-	program.AttachShader(vertex_shader)
-	program.AttachShader(fragment_shader)
-
-	program.BindFragDataLocation(0, "outColor")
-	program.Link()
-	program.Use()
-	defer program.Delete()
-
-	positionAttrib := program.GetAttribLocation("position")
-	positionAttrib.AttribPointer(3, gl.FLOAT, false, 0, nil)
-	positionAttrib.EnableArray()
-	defer positionAttrib.DisableArray()
-
-	gl.ClearColor(0.2, 0.2, 0.23, 0.0)
-
-	client, err := JoinServer(host, port)
-	if err != nil {
-		panic(err)
-	}
-
 	defer client.Shutdown()
 
-	run(window, client)
+	run()
 }
 
-func checkGLerror() {
-	if glerr := gl.GetError(); glerr != gl.NO_ERROR {
-		string, _ := glu.ErrorString(glerr)
-		panic(string)
-	}
-}
-
-func run(window *glfw.Window, client *Client) {
+func run() {
 	// start the tick goroutine
 	tick := make(chan bool)
 	go tick_run(20, tick)
 
-	// open the window draw 10 frames, hopefully glfw settles down a little
-	// without this, it doesn't draw the window decoration, catch keypresses etc.
-	for i := 0; i < 10; i++ {
-		glfw.PollEvents()
-		frame(window)
-		time.Sleep(10 * time.Millisecond)
-	}
-
-	for !window.ShouldClose() {
+	for !renderer.ShouldClose() {
 		select {
 		case <-tick:
-			frame(window)
+			renderer.DrawFrame()
 		case packet := <-client.packets:
-			handlePacket(client, packet)
+			handlePacket(packet)
 		}
 	}
 
@@ -162,19 +69,7 @@ func tick_run(everyMS int, tick chan bool) {
 	}
 }
 
-func frame(window *glfw.Window) {
-	gl.Clear(gl.COLOR_BUFFER_BIT)
-	gl.DrawArrays(gl.TRIANGLES, 0, 3)
-
-	window.SwapBuffers()
-	glfw.PollEvents()
-
-	if window.GetKey(glfw.KeyEscape) == glfw.Press {
-		window.SetShouldClose(true)
-	}
-}
-
-func handlePacket(client *Client, packet *Packet) {
+func handlePacket(packet *Packet) {
 	switch packet.Id {
 	case 0x0:
 		keepalive, err := ParseKeepalive(packet)
