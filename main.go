@@ -37,6 +37,9 @@ var (
 	varintBuff [binary.MaxVarintLen64]byte
 	host       = "localhost"
 	port       = 25565
+
+	vertex_shader   gl.Shader
+	fragment_shader gl.Shader
 )
 
 func main() {
@@ -49,7 +52,9 @@ func main() {
 	/// lock glfw/gl calls to a single thread
 	runtime.LockOSThread()
 
-	glfw.Init()
+	if !glfw.Init() {
+		panic("Couldn't init GLFW3")
+	}
 	defer glfw.Terminate()
 
 	glfw.WindowHint(glfw.ContextVersionMajor, 3)
@@ -79,13 +84,13 @@ func main() {
 
 	gl.BufferData(gl.ARRAY_BUFFER, len(verticies)*4, verticies, gl.STATIC_DRAW)
 
-	vertex_shader := gl.CreateShader(gl.VERTEX_SHADER)
+	vertex_shader = gl.CreateShader(gl.VERTEX_SHADER)
 	vertex_shader.Source(vertex)
 	vertex_shader.Compile()
 	fmt.Println(vertex_shader.GetInfoLog())
 	defer vertex_shader.Delete()
 
-	fragment_shader := gl.CreateShader(gl.FRAGMENT_SHADER)
+	fragment_shader = gl.CreateShader(gl.FRAGMENT_SHADER)
 	fragment_shader.Source(fragment)
 	fragment_shader.Compile()
 	fmt.Println(fragment_shader.GetInfoLog())
@@ -130,8 +135,11 @@ func run(window *glfw.Window, client *Client) {
 	go tick_run(20, tick)
 
 	// open the window draw 10 frames, hopefully glfw settles down a little
+	// without this, it doesn't draw the window decoration, catch keypresses etc.
 	for i := 0; i < 10; i++ {
+		glfw.PollEvents()
 		frame(window)
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	for !window.ShouldClose() {
