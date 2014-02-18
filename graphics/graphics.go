@@ -44,6 +44,7 @@ type Renderer struct {
 }
 
 func Init() (r *Renderer) {
+	r = &Renderer{}
 
 	glfw.WindowHint(glfw.ContextVersionMajor, 3)
 	glfw.WindowHint(glfw.ContextVersionMinor, 3)

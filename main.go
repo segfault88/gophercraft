@@ -28,12 +28,19 @@ func main() {
 		panic("Couldn't init GLFW3")
 	}
 
-	// ping the minecraft server to see if it is there before moving further
-	json, err := Ping(host, port)
-	fmt.Printf("Ping Response:\n%s\n", json)
+	glfw.PollEvents()
+
+	glfw.WindowHint(glfw.ContextVersionMajor, 3)
+	glfw.WindowHint(glfw.ContextVersionMinor, 3)
+	glfw.WindowHint(glfw.OpenglForwardCompatible, glfw.True)
+	glfw.WindowHint(glfw.OpenglProfile, glfw.OpenglCoreProfile)
 
 	renderer = graphics.Init()
 	defer renderer.Shutdown()
+
+	// ping the minecraft server to see if it is there before moving further
+	json, err := Ping(host, port)
+	fmt.Printf("Ping Response:\n%s\n", json)
 
 	client, err = JoinServer(host, port)
 	if err != nil {
