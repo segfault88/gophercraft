@@ -53,7 +53,7 @@ func Init() (r *Renderer) {
 	var err error
 	r.window, err = glfw.CreateWindow(800, 600, "Example", nil, nil)
 	if err != nil {
-		panic(err)
+		panic(err.Error())
 	}
 
 	r.window.MakeContextCurrent()
