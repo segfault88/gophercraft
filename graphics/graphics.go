@@ -37,15 +37,18 @@ void main()
 
 var (
 	verticies = []float32{
-		0.0, 0.5, 1.0, 0.0, 0.0,
-		0.5, -0.5, 0.0, 1.0, 0.0,
-		-0.5, -0.5, 0.0, 0.0, 1.0}
+		-0.5, 0.5, 1.0, 0.0, 0.0, // Top-left
+		0.5, 0.5, 0.0, 1.0, 0.0, // Top-right
+		0.5, -0.5, 0.0, 0.0, 1.0, // Bottom-right
+		-0.5, -0.5, 1.0, 1.0, 1.0 /* Bottom-left */}
+	elements = []uint32{0, 1, 2, 2, 3, 0}
 )
 
 type Renderer struct {
 	window          *glfw.Window
 	vao             gl.VertexArray
 	vbo             gl.Buffer
+	ebo             gl.Buffer
 	vertex_shader   gl.Shader
 	fragment_shader gl.Shader
 	program         gl.Program
@@ -85,8 +88,11 @@ func Init() (r *Renderer, err error) {
 
 	r.vbo = gl.GenBuffer()
 	r.vbo.Bind(gl.ARRAY_BUFFER)
-
 	gl.BufferData(gl.ARRAY_BUFFER, len(verticies)*4, verticies, gl.STATIC_DRAW)
+
+	r.ebo = gl.GenBuffer()
+	r.ebo.Bind(gl.ELEMENT_ARRAY_BUFFER)
+	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(elements)*4, elements, gl.STATIC_DRAW)
 
 	r.vertex_shader = gl.CreateShader(gl.VERTEX_SHADER)
 	r.vertex_shader.Source(vertex)
@@ -112,7 +118,7 @@ func Init() (r *Renderer, err error) {
 
 	r.colorAttrib = r.program.GetAttribLocation("color")
 	r.colorAttrib.EnableArray()
-	r.colorAttrib.AttribPointer(3, gl.FLOAT, false, 2*4, nil)
+	r.colorAttrib.AttribPointer(3, gl.FLOAT, false, 5*4, nil)
 
 	gl.ClearColor(0.2, 0.2, 0.23, 0.0)
 
@@ -143,6 +149,9 @@ func (r *Renderer) Shutdown() {
 	r.vertex_shader.Delete()
 	r.vertex_shader = 0
 
+	r.ebo.Delete()
+	r.ebo = 0
+
 	r.vbo.Delete()
 	r.vbo = 0
 
@@ -154,7 +163,7 @@ func (r *Renderer) Shutdown() {
 
 func (r *Renderer) DrawFrame() {
 	gl.Clear(gl.COLOR_BUFFER_BIT)
-	gl.DrawArrays(gl.TRIANGLES, 0, 3)
+	gl.DrawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, nil)
 
 	r.window.SwapBuffers()
 	glfw.PollEvents()
