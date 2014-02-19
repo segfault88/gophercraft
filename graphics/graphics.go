@@ -13,24 +13,33 @@ const (
 	vertex = `#version 330
 
 in vec2 position;
+in vec3 color;
+
+out vec3 Color;
 
 void main()
 {
+	Color = color;
     gl_Position = vec4(position, 0.0, 1.0);
 }`
 
 	fragment = `#version 330
 
+in vec3 Color;
+
 out vec4 outColor;
 
 void main()
 {
-    outColor = vec4(1.0, 1.0, 1.0, 1.0);
+    outColor = vec4(Color, 1.0);
 }`
 )
 
 var (
-	verticies = []float32{0, 1, 0, -1, -1, 0, 1, -1, 0}
+	verticies = []float32{
+		0.0, 0.5, 1.0, 0.0, 0.0,
+		0.5, -0.5, 0.0, 1.0, 0.0,
+		-0.5, -0.5, 0.0, 0.0, 1.0}
 )
 
 type Renderer struct {
@@ -41,6 +50,7 @@ type Renderer struct {
 	fragment_shader gl.Shader
 	program         gl.Program
 	positionAttrib  gl.AttribLocation
+	colorAttrib     gl.AttribLocation
 }
 
 func Init() (r *Renderer, err error) {
@@ -88,8 +98,12 @@ func Init() (r *Renderer, err error) {
 	r.program.Use()
 
 	r.positionAttrib = r.program.GetAttribLocation("position")
-	r.positionAttrib.AttribPointer(3, gl.FLOAT, false, 0, nil)
+	r.positionAttrib.AttribPointer(2, gl.FLOAT, false, 5*4, nil)
 	r.positionAttrib.EnableArray()
+
+	r.colorAttrib = r.program.GetAttribLocation("color")
+	r.colorAttrib.AttribPointer(3, gl.FLOAT, false, 2*4, nil)
+	r.colorAttrib.EnableArray()
 
 	gl.ClearColor(0.2, 0.2, 0.23, 0.0)
 
@@ -105,6 +119,9 @@ func Init() (r *Renderer, err error) {
 }
 
 func (r *Renderer) Shutdown() {
+	r.colorAttrib.DisableArray()
+	r.colorAttrib = 0
+
 	r.positionAttrib.DisableArray()
 	r.positionAttrib = 0
 
