@@ -21,6 +21,8 @@ var (
 func main() {
 	fmt.Println("Gophercraft!\n")
 
+	var err error
+
 	/// lock glfw/gl calls to a single thread
 	runtime.LockOSThread()
 
@@ -35,7 +37,12 @@ func main() {
 	glfw.WindowHint(glfw.OpenglForwardCompatible, glfw.True)
 	glfw.WindowHint(glfw.OpenglProfile, glfw.OpenglCoreProfile)
 
-	renderer = graphics.Init()
+	renderer, err = graphics.Init()
+
+	if err != nil {
+		panic("Couldn't initialize graphics! " + err.Error())
+	}
+
 	defer renderer.Shutdown()
 
 	// ping the minecraft server to see if it is there before moving further

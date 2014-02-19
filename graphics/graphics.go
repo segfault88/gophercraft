@@ -43,7 +43,7 @@ type Renderer struct {
 	positionAttrib  gl.AttribLocation
 }
 
-func Init() (r *Renderer) {
+func Init() (r *Renderer, err error) {
 	r = &Renderer{}
 
 	glfw.WindowHint(glfw.ContextVersionMajor, 3)
@@ -51,7 +51,6 @@ func Init() (r *Renderer) {
 	glfw.WindowHint(glfw.OpenglForwardCompatible, glfw.True)
 	glfw.WindowHint(glfw.OpenglProfile, glfw.OpenglCoreProfile)
 
-	var err error
 	r.window, err = glfw.CreateWindow(800, 600, "Example", nil, nil)
 	if err != nil {
 		panic(err.Error())
