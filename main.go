@@ -3,9 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
-	glfw "github.com/go-gl/glfw3"
 	"github.com/segfault88/gophercraft/graphics"
-	"runtime"
 	"time"
 )
 
@@ -22,21 +20,6 @@ func main() {
 	fmt.Println("Gophercraft!\n")
 
 	var err error
-
-	/// lock glfw/gl calls to a single thread
-	runtime.LockOSThread()
-
-	if !glfw.Init() {
-		panic("Couldn't init GLFW3")
-	}
-
-	glfw.PollEvents()
-
-	glfw.WindowHint(glfw.ContextVersionMajor, 3)
-	glfw.WindowHint(glfw.ContextVersionMinor, 3)
-	glfw.WindowHint(glfw.OpenglForwardCompatible, glfw.True)
-	glfw.WindowHint(glfw.OpenglProfile, glfw.OpenglCoreProfile)
-
 	renderer, err = graphics.Init()
 
 	if err != nil {

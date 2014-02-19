@@ -2,10 +2,10 @@ package graphics
 
 import (
 	"fmt"
-	// "runtime"
 	"github.com/go-gl/gl"
 	glfw "github.com/go-gl/glfw3"
 	"github.com/go-gl/glu"
+	"runtime"
 	"time"
 )
 
@@ -56,6 +56,15 @@ type Renderer struct {
 func Init() (r *Renderer, err error) {
 	r = &Renderer{}
 
+	// lock glfw/gl calls to a single thread
+	runtime.LockOSThread()
+
+	if !glfw.Init() {
+		panic("Couldn't init GLFW3")
+	}
+
+	glfw.PollEvents()
+
 	glfw.WindowHint(glfw.ContextVersionMajor, 3)
 	glfw.WindowHint(glfw.ContextVersionMinor, 3)
 	glfw.WindowHint(glfw.OpenglForwardCompatible, glfw.True)
@@ -98,12 +107,12 @@ func Init() (r *Renderer, err error) {
 	r.program.Use()
 
 	r.positionAttrib = r.program.GetAttribLocation("position")
-	r.positionAttrib.AttribPointer(2, gl.FLOAT, false, 5*4, nil)
 	r.positionAttrib.EnableArray()
+	r.positionAttrib.AttribPointer(2, gl.FLOAT, false, 5*4, nil)
 
 	r.colorAttrib = r.program.GetAttribLocation("color")
-	r.colorAttrib.AttribPointer(3, gl.FLOAT, false, 2*4, nil)
 	r.colorAttrib.EnableArray()
+	r.colorAttrib.AttribPointer(3, gl.FLOAT, false, 2*4, nil)
 
 	gl.ClearColor(0.2, 0.2, 0.23, 0.0)
 
