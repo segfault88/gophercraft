@@ -109,12 +109,12 @@ func Init() (r *Renderer, err error) {
 	r.vertex_shader = gl.CreateShader(gl.VERTEX_SHADER)
 	r.vertex_shader.Source(vertex)
 	r.vertex_shader.Compile()
-	fmt.Println(r.vertex_shader.GetInfoLog())
+	fmt.Printf("\n!\n%s\n", r.vertex_shader.GetInfoLog())
 
 	r.fragment_shader = gl.CreateShader(gl.FRAGMENT_SHADER)
 	r.fragment_shader.Source(fragment)
 	r.fragment_shader.Compile()
-	fmt.Println(r.fragment_shader.GetInfoLog())
+	fmt.Printf("\n!\n%s\n", r.fragment_shader.GetInfoLog())
 
 	r.program = gl.CreateProgram()
 	r.program.AttachShader(r.vertex_shader)
@@ -126,15 +126,15 @@ func Init() (r *Renderer, err error) {
 
 	r.positionAttrib = r.program.GetAttribLocation("position")
 	r.positionAttrib.EnableArray()
-	r.positionAttrib.AttribPointer(7, gl.FLOAT, false, 7*4, nil)
+	r.positionAttrib.AttribPointer(2, gl.FLOAT, false, 7*4, nil)
 
 	r.colorAttrib = r.program.GetAttribLocation("color")
 	r.colorAttrib.EnableArray()
-	r.colorAttrib.AttribPointer(7, gl.FLOAT, false, 7*4, nil)
+	r.colorAttrib.AttribPointer(3, gl.FLOAT, false, 7*4, nil)
 
 	r.texAttrib = r.program.GetAttribLocation("texcoord")
 	r.texAttrib.EnableArray()
-	r.texAttrib.AttribPointer(7, gl.FLOAT, false, 7*4, nil)
+	r.texAttrib.AttribPointer(2, gl.FLOAT, false, 7*4, nil)
 
 	r.texture, err = createTexture("data/sample.png")
 	if err != nil {
