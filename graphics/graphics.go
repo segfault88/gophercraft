@@ -1,10 +1,14 @@
 package graphics
 
 import (
+	"errors"
 	"fmt"
 	"github.com/go-gl/gl"
 	glfw "github.com/go-gl/glfw3"
 	"github.com/go-gl/glu"
+	"image"
+	"image/png"
+	"os"
 	"runtime"
 	"time"
 )
@@ -14,33 +18,39 @@ const (
 
 in vec2 position;
 in vec3 color;
+in vec2 texcoord;
 
 out vec3 Color;
+out vec2 Texcoord;
 
 void main()
 {
 	Color = color;
+	Texcoord = texcoord;
     gl_Position = vec4(position, 0.0, 1.0);
 }`
 
 	fragment = `#version 330
 
 in vec3 Color;
+in vec2 Texcoord;
 
 out vec4 outColor;
 
+uniform sampler2D tex;
+
 void main()
 {
-    outColor = vec4(Color, 1.0);
+    outColor = texture(tex, Texcoord) * vec4(Color, 1.0);
 }`
 )
 
 var (
 	verticies = []float32{
-		-0.5, 0.5, 1.0, 0.0, 0.0, // Top-left
-		0.5, 0.5, 0.0, 1.0, 0.0, // Top-right
-		0.5, -0.5, 0.0, 0.0, 1.0, // Bottom-right
-		-0.5, -0.5, 1.0, 1.0, 1.0 /* Bottom-left */}
+		-0.5, 0.5, 1.0, 0.0, 0.0, 0.0, 0.0, // Top-left
+		0.5, 0.5, 0.0, 1.0, 0.0, 1.0, 0.0, // Top-right
+		0.5, -0.5, 0.0, 0.0, 1.0, 1.0, 1.0, // Bottom-right
+		-0.5, -0.5, 1.0, 1.0, 1.0, 0.0, 1.0} // Bottom-left}
 	elements = []uint32{0, 1, 2, 2, 3, 0}
 )
 
@@ -54,6 +64,8 @@ type Renderer struct {
 	program         gl.Program
 	positionAttrib  gl.AttribLocation
 	colorAttrib     gl.AttribLocation
+	texture         gl.Texture
+	texAttrib       gl.AttribLocation
 }
 
 func Init() (r *Renderer, err error) {
@@ -114,11 +126,23 @@ func Init() (r *Renderer, err error) {
 
 	r.positionAttrib = r.program.GetAttribLocation("position")
 	r.positionAttrib.EnableArray()
-	r.positionAttrib.AttribPointer(2, gl.FLOAT, false, 5*4, nil)
+	r.positionAttrib.AttribPointer(7, gl.FLOAT, false, 7*4, nil)
 
 	r.colorAttrib = r.program.GetAttribLocation("color")
 	r.colorAttrib.EnableArray()
-	r.colorAttrib.AttribPointer(3, gl.FLOAT, false, 5*4, nil)
+	r.colorAttrib.AttribPointer(7, gl.FLOAT, false, 7*4, nil)
+
+	r.texAttrib = r.program.GetAttribLocation("texcoord")
+	r.texAttrib.EnableArray()
+	r.texAttrib.AttribPointer(7, gl.FLOAT, false, 7*4, nil)
+
+	r.texture, err = createTexture("data/sample.png")
+	if err != nil {
+		panic(err)
+	}
+
+	estring, err := glu.ErrorString(gl.GetError())
+	fmt.Printf("\n\n***\n%s\n\n\n", estring)
 
 	gl.ClearColor(0.2, 0.2, 0.23, 0.0)
 
@@ -182,4 +206,40 @@ func checkGLerror() {
 		string, _ := glu.ErrorString(glerr)
 		panic(string)
 	}
+}
+
+func createTexture(filename string) (gl.Texture, error) {
+	r, err := os.Open(filename)
+	if err != nil {
+		return gl.Texture(0), errors.New("Unable to open file: " + err.Error())
+	}
+
+	img, err := png.Decode(r)
+	if err != nil {
+		return gl.Texture(0), err
+	}
+
+	rgbaImg, ok := img.(*image.NRGBA)
+	if !ok {
+		return gl.Texture(0), errors.New("texture must be an NRGBA image")
+	}
+
+	textureId := gl.GenTexture()
+	textureId.Bind(gl.TEXTURE_2D)
+	gl.TexParameterf(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+	gl.TexParameterf(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+
+	// flip image: first pixel is lower left corner
+	imgWidth, imgHeight := img.Bounds().Dx(), img.Bounds().Dy()
+	data := make([]byte, imgWidth*imgHeight*4)
+	lineLen := imgWidth * 4
+	dest := len(data) - lineLen
+	for src := 0; src < len(rgbaImg.Pix); src += rgbaImg.Stride {
+		copy(data[dest:dest+lineLen], rgbaImg.Pix[src:src+rgbaImg.Stride])
+		dest -= lineLen
+	}
+	gl.TexImage2D(gl.TEXTURE_2D, 0, 4, imgWidth, imgHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, data)
+	gl.GenerateMipmap(gl.TEXTURE_2D)
+
+	return textureId, nil
 }
