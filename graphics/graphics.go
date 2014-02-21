@@ -130,11 +130,11 @@ func Init() (r *Renderer, err error) {
 
 	r.colorAttrib = r.program.GetAttribLocation("color")
 	r.colorAttrib.EnableArray()
-	r.colorAttrib.AttribPointer(3, gl.FLOAT, false, 7*4, nil)
+	r.colorAttrib.AttribPointer(3, gl.FLOAT, false, 3*4, nil)
 
 	r.texAttrib = r.program.GetAttribLocation("texcoord")
 	r.texAttrib.EnableArray()
-	r.texAttrib.AttribPointer(2, gl.FLOAT, false, 7*4, nil)
+	r.texAttrib.AttribPointer(2, gl.FLOAT, false, 2*4, nil)
 
 	r.texture, err = createTexture("data/sample.png")
 	if err != nil {
